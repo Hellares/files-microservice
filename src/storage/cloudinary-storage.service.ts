@@ -35,10 +35,23 @@ export class CloudinaryStorageService implements StorageService {
 
   async delete(filename: string): Promise<void> {
     try {
-      await cloudinary.uploader.destroy(filename);
+      // Extraer el public_id
+      const publicId = this.extractPublicId(filename);
+      
+      const result = await cloudinary.uploader.destroy(publicId);
+      
+      if (result.result !== 'ok') {
+        throw new Error(`Error al eliminar archivo de Cloudinary: ${result.result}`);
+      }
+
+      this.logger.debug(`✅ Archivo eliminado correctamente de Cloudinary: ${publicId}`);
     } catch (error) {
-      this.logger.error('Error deleting from Cloudinary:', error);
-      throw new Error('Error deleting file from Cloudinary');
+      this.logger.error('❌ Error eliminando de Cloudinary:', {
+        error: error.message,
+        filename,
+        stack: error.stack
+      });
+      throw new Error(`Error eliminando archivo de Cloudinary: ${error.message}`);
     }
   }
 
@@ -51,5 +64,10 @@ export class CloudinaryStorageService implements StorageService {
       this.logger.error('Error getting file from Cloudinary:', error);
       throw new Error('Error retrieving file from Cloudinary');
     }
+  }
+
+  private extractPublicId(filename: string): string {
+    // Remover extensión y parámetros de URL si existen
+    return filename.split('.')[0].split('?')[0];
   }
 }
