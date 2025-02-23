@@ -8,45 +8,6 @@ export class FilesController {
 
   constructor(private readonly filesService: FilesService) {}
 
-  // @MessagePattern('file.upload')
-  // async uploadFile(
-  //   @Payload() data: { 
-  //     file: Express.Multer.File, 
-  //     provider?: string,
-  //     type?: string // Añadimos el tipo de archivo
-  //   }, 
-  //   @Ctx() context: RmqContext
-  // ) {
-  //   const channel = context.getChannelRef();
-  //   const originalMsg = context.getMessage();
-
-  //   try {
-  //     const file = {
-  //       ...data.file,
-  //       buffer: Buffer.from(data.file.buffer)
-  //     };
-      
-  //     this.logger.debug(`📤 Subiendo archivo: ${file.originalname} (Tipo: ${data.type || 'default'})`);
-      
-  //     const result = await this.filesService.uploadFile(
-  //       file, 
-  //       data.provider,
-  //       data.type // Pasamos el tipo al servicio
-  //     );
-      
-  //     await this.safeAck(channel, originalMsg);
-  //     return result;
-  //   } catch (error) {
-  //     await this.safeAck(channel, originalMsg);
-  //     this.logger.error('❌ Error al subir archivo:', {
-  //       error: error.message,
-  //       filename: data.file.originalname,
-  //       type: data.type
-  //     });
-  //     throw new RpcException(error.message);
-  //   }
-  // }
-
   @MessagePattern('file.upload.start')
   async handleUploadStart(
     @Payload() data: { uploadId: string; totalChunks: number; metadata: any },
@@ -153,40 +114,6 @@ export class FilesController {
     }
   }
 
-
-  // @MessagePattern('file.delete')
-  // async deleteFile(@Payload() data: { filename: string, provider?: string }, @Ctx() context: RmqContext) {
-  //   const channel = context.getChannelRef();
-  //   const originalMsg = context.getMessage();
-
-  //   try {
-  //     this.logger.debug(`🗑️ Eliminando archivo: ${data.filename}`);
-  //     const result = await this.filesService.deleteFile(data.filename, data.provider);
-  //     await this.safeAck(channel, originalMsg);
-  //     return result;
-  //   } catch (error) {
-  //     await this.safeAck(channel, originalMsg);
-  //     this.logger.error('❌ Error al eliminar archivo:', error);
-  //     throw new RpcException(error.message);
-  //   }
-  // }
-
-  // @MessagePattern('file.get')
-  // async getFile(@Payload() data: { filename: string, provider?: string }, @Ctx() context: RmqContext) {
-  //   const channel = context.getChannelRef();
-  //   const originalMsg = context.getMessage();
-
-  //   try {
-  //     this.logger.debug(`📥 Obteniendo archivo: ${data.filename}`);
-  //     const result = await this.filesService.getFile(data.filename, data.provider);
-  //     await this.safeAck(channel, originalMsg);
-  //     return result;
-  //   } catch (error) {
-  //     await this.safeAck(channel, originalMsg);
-  //     this.logger.error('❌ Error al obtener archivo:', error);
-  //     throw new RpcException(error.message);
-  //   }
-  // }
 
   @MessagePattern('file.delete')
   async deleteFile(

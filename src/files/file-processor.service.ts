@@ -24,7 +24,7 @@ export class FileProcessorService {
   private readonly config: Record<string, FileConfig> = {
     // Configuración base para tipos genéricos
     image: {
-      maxSize: 5 * 1024 * 1024,
+      maxSize: 10 * 1024 * 1024,
       allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
       processOptions: {
         image: {
@@ -43,6 +43,17 @@ export class FileProcessorService {
           maxWidth: 800,
           maxHeight: 600,
           quality: 80,
+        },
+      },
+    },
+    portada: {
+      maxSize: 10 * 1024 * 1024,
+      allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      processOptions: {
+        image: {
+          maxWidth: 1920,
+          maxHeight: 1080,
+          quality: 90,
         },
       },
     },
@@ -185,54 +196,8 @@ export class FileProcessorService {
       return 'document';
     return null;
   }
-
   
-  // En file-processor.service.ts
-  // private async processImage(
-  //   buffer: Buffer,
-  //   options?: FileConfig['processOptions']['image']
-  // ): Promise<{ buffer: Buffer; info: any }> {
-  //   try {
-  //     const image = sharp(buffer, {
-  //       failOnError: true,
-  //       limitInputPixels: 50000000 // Limitar tamaño de entrada
-  //     });
-
-  //     // Optimizar pipeline de procesamiento
-  //     image
-  //       .resize(options?.maxWidth, options?.maxHeight, {
-  //         fit: 'inside',
-  //         withoutEnlargement: true,
-  //         fastShrinkOnLoad: true // Optimización adicional
-  //       })
-  //       .webp({
-  //         quality: options?.quality || 80,
-  //         effort: 2, // Reducir esfuerzo de compresión
-  //         force: true // Forzar conversión a WebP
-  //       });
-
-  //     // Ejecutar pipeline y obtener buffer
-  //     const processedBuffer = await image.toBuffer({ resolveWithObject: true });
-
-  //     const info = {
-  //       format: 'webp',
-  //       width: processedBuffer.info.width,
-  //       height: processedBuffer.info.height,
-  //       originalSize: buffer.length,
-  //       processedSize: processedBuffer.data.length,
-  //       compressionRatio: ((buffer.length - processedBuffer.data.length) / buffer.length * 100).toFixed(2) + '%'
-  //     };
-
-  //     return {
-  //       buffer: processedBuffer.data,
-  //       info
-  //     };
-  //   } catch (error) {
-  //     this.logger.error(`Error procesando imagen: ${error.message}`);
-  //     throw new Error('Error al procesar la imagen');
-  //   }
-  // }
-
+  
   private async processImage(
     buffer: Buffer,
     options?: FileConfig['processOptions']['image']
