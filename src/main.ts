@@ -21,7 +21,9 @@ async function bootstrap() {
         prefetchCount: 3,
         socketOptions: {
           keepAlive: true,
-          heartbeatIntervalInSeconds: 30
+          heartbeatIntervalInSeconds: 30,
+          timeout: envs.uploadTimeout,
+          noDelay: true,
         }
       }
     }
@@ -29,6 +31,7 @@ async function bootstrap() {
 
   app.listen().then(() => {
     logger.log(`${CONSOLE_COLORS.TEXT.GREEN}Files Microservice is running on ${envs.port} port`);
+    logger.log(`Max file size: ${envs.maxFileSize / (1024 * 1024)}MB`);
   });
 }
 bootstrap();

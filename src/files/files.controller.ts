@@ -1,6 +1,8 @@
 import { Controller, Logger } from '@nestjs/common';
 import { Ctx, MessagePattern, Payload, RmqContext, RpcException } from '@nestjs/microservices';
 import { FilesService } from './files.service';
+import { formatFileSize } from 'src/common/util/format-file-size.util';
+
 
 @Controller()
 export class FilesController {
@@ -8,81 +10,18 @@ export class FilesController {
 
   constructor(private readonly filesService: FilesService) {}
 
-  @MessagePattern('file.upload.start')
-  async handleUploadStart(
-    @Payload() data: { uploadId: string; totalChunks: number; metadata: any },
-    @Ctx() context: RmqContext
-  ) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-    const startTime = Date.now();
-
-    try {
-      this.logger.debug(`🚀 Iniciando nuevo upload por chunks: ${data.uploadId}`);
-      const result = await this.filesService.handleUploadStart(data);
-      await this.safeAck(channel, originalMsg);
-      
-      this.logger.debug(`✅ Upload iniciado: ${data.uploadId} (${Date.now() - startTime}ms)`);
-      return result;
-    } catch (error) {
-      await this.safeAck(channel, originalMsg);
-      this.logger.error('❌ Error al iniciar upload:', {
-        uploadId: data.uploadId,
-        error: error.message,
-        duration: Date.now() - startTime
-      });
-      throw new RpcException(error.message);
-    }
-  }
-
-  @MessagePattern('file.upload.chunk')
-  async handleChunkUpload(
-    @Payload() data: { 
-      uploadId: string; 
-      chunkIndex: number; 
-      chunk: Buffer;
-      isLast: boolean;
-    },
-    @Ctx() context: RmqContext
-  ) {
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-    const startTime = Date.now();
-
-    try {
-      this.logger.debug(`📦 Recibiendo chunk ${data.chunkIndex} para upload ${data.uploadId}`);
-      const result = await this.filesService.handleChunkUpload(data);
-      await this.safeAck(channel, originalMsg);
-
-      const duration = Date.now() - startTime;
-      this.logger.debug(
-        `✅ Chunk ${data.chunkIndex} procesado ${data.isLast ? '(último chunk)' : ''} (${duration}ms)`
-      );
-      return result;
-    } catch (error) {
-      await this.safeAck(channel, originalMsg);
-      this.logger.error('❌ Error procesando chunk:', {
-        uploadId: data.uploadId,
-        chunkIndex: data.chunkIndex,
-        error: error.message,
-        duration: Date.now() - startTime
-      });
-      throw new RpcException(error.message);
-    }
-  }
-
   @MessagePattern('file.upload')
   async uploadFile(
     @Payload() data: { 
       file: Express.Multer.File, 
-      provider?: string,
-      type?: string
+      provider?: string
     }, 
     @Ctx() context: RmqContext
   ) {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
     const startTime = Date.now();
+    const fileSize = formatFileSize(data.file.size);
 
     try {
       const file = {
@@ -90,30 +29,27 @@ export class FilesController {
         buffer: Buffer.from(data.file.buffer)
       };
       
-      this.logger.debug(`📤 Subiendo archivo: ${file.originalname} (${file.size} bytes)`);
+      this.logger.debug(`📤 Iniciando upload: ${file.originalname} (${fileSize})`);
       
-      const result = await this.filesService.uploadFile(
-        file, 
-        data.provider,
-        data.type
-      );
-      
+      const result = await this.filesService.uploadFile(file, data.provider);
       await this.safeAck(channel, originalMsg);
       
-      this.logger.debug(`✅ Archivo subido: ${file.originalname} (${Date.now() - startTime}ms)`);
+      const duration = Date.now() - startTime;
+      this.logger.debug(`✅ Upload completado: ${file.originalname} en ${duration}ms`);
+      
       return result;
     } catch (error) {
       await this.safeAck(channel, originalMsg);
-      this.logger.error('❌ Error al subir archivo:', {
-        filename: data.file.originalname,
-        type: data.type,
+      this.logger.error(`❌ Error en upload de ${data.file.originalname} (${fileSize})`, {
         error: error.message,
-        duration: Date.now() - startTime
+        // duration: `${Date.now() - startTime}ms`
       });
-      throw new RpcException(error.message);
+      throw new RpcException({
+        message: `Error al subir archivo: ${error.message}`,
+        statusCode: 500
+      });
     }
   }
-
 
   @MessagePattern('file.delete')
   async deleteFile(
@@ -125,16 +61,24 @@ export class FilesController {
     const startTime = Date.now();
 
     try {
-      this.logger.debug(`🗑️ Eliminando archivo: ${data.filename}`);
+      this.logger.debug(`🗑️ Eliminando: ${data.filename}`);
+      
       const result = await this.filesService.deleteFile(data.filename, data.provider);
       await this.safeAck(channel, originalMsg);
       
-      this.logger.debug(`✅ Archivo eliminado: ${data.filename} (${Date.now() - startTime}ms)`);
+      const duration = Date.now() - startTime;
+      this.logger.debug(`✅ Archivo eliminado: ${data.filename} en ${duration}ms`);
       return result;
     } catch (error) {
       await this.safeAck(channel, originalMsg);
-      this.logger.error('❌ Error al eliminar archivo:', error);
-      throw new RpcException(error.message);
+      this.logger.error(`❌ Error al eliminar ${data.filename}`, {
+        error: error.message,
+        // duration: `${Date.now() - startTime}ms`
+      });
+      throw new RpcException({
+        message: `Error al eliminar archivo: ${error.message}`,
+        statusCode: 500
+      });
     }
   }
 
@@ -148,16 +92,24 @@ export class FilesController {
     const startTime = Date.now();
 
     try {
-      this.logger.debug(`📥 Obteniendo archivo: ${data.filename}`);
+      this.logger.debug(`📥 Descargando: ${data.filename}`);
+      
       const result = await this.filesService.getFile(data.filename, data.provider);
       await this.safeAck(channel, originalMsg);
       
-      this.logger.debug(`✅ Archivo obtenido: ${data.filename} (${Date.now() - startTime}ms)`);
+      const duration = Date.now() - startTime;
+      this.logger.debug(`✅ Archivo descargado: ${data.filename} en ${duration}ms`);
       return result;
     } catch (error) {
       await this.safeAck(channel, originalMsg);
-      this.logger.error('❌ Error al obtener archivo:', error);
-      throw new RpcException(error.message);
+      this.logger.error(`❌ Error al descargar ${data.filename}`, {
+        error: error.message,
+        // duration: `${Date.now() - startTime}ms`
+      });
+      throw new RpcException({
+        message: `Error al obtener archivo: ${error.message}`,
+        statusCode: 500
+      });
     }
   }
 
@@ -165,12 +117,10 @@ export class FilesController {
     try {
       if (channel?.ack && message) {
         await channel.ack(message);
-        // this.logger.debug(`✅ Mensaje RabbitMQ confirmado - Operación: `);
       }
-    } catch (ackError) {
-      this.logger.error('❌ Error en ACK de RabbitMQ:', {
-        error: ackError.message,
-        stack: ackError.stack,
+    } catch (error) {
+      this.logger.error(`❌ Error en ACK RabbitMQ`, {
+        error: error.message,
         timestamp: new Date().toISOString()
       });
     }

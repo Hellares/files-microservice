@@ -7,6 +7,8 @@ import { StorageModule } from './storage/storage.module';
     StorageModule,
     FilesModule],
   controllers: [],
-  providers: [],
+  providers: [
+    
+  ],
 })
 export class AppModule {}

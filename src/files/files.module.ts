@@ -6,7 +6,11 @@ import { FileProcessorService } from './file-processor.service';
 
 @Module({
   controllers: [FilesController],
-  providers: [FilesService,FileProcessorService],
+  providers: [
+    FilesService,
+    FileProcessorService,
+    
+  ],
   imports: [StorageModule]
 })
 export class FilesModule {}
