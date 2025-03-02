@@ -4,6 +4,7 @@ import { FilesService } from './files.service';
 import { formatFileSize } from 'src/common/util/format-file-size.util';
 
 
+
 @Controller()
 export class FilesController {
   private readonly logger = new Logger(FilesController.name);
@@ -14,7 +15,8 @@ export class FilesController {
   async uploadFile(
     @Payload() data: { 
       file: Express.Multer.File, 
-      provider?: string
+      provider?: string,
+      tenantId?: string
     }, 
     @Ctx() context: RmqContext
   ) {
@@ -22,6 +24,7 @@ export class FilesController {
     const originalMsg = context.getMessage();
     const startTime = Date.now();
     const fileSize = formatFileSize(data.file.size);
+  
 
     try {
       const file = {
@@ -31,18 +34,19 @@ export class FilesController {
       
       this.logger.debug(`📤 Iniciando upload: ${file.originalname} (${fileSize})`);
       
-      const result = await this.filesService.uploadFile(file, data.provider);
+      const result = await this.filesService.uploadFile(file, data.provider , data.tenantId);
       await this.safeAck(channel, originalMsg);
       
       const duration = Date.now() - startTime;
       this.logger.debug(`✅ Upload completado: ${file.originalname} en ${duration}ms`);
       
       return result;
+      
     } catch (error) {
+
       await this.safeAck(channel, originalMsg);
       this.logger.error(`❌ Error en upload de ${data.file.originalname} (${fileSize})`, {
         error: error.message,
-        // duration: `${Date.now() - startTime}ms`
       });
       throw new RpcException({
         message: `Error al subir archivo: ${error.message}`,
@@ -53,7 +57,11 @@ export class FilesController {
 
   @MessagePattern('file.delete')
   async deleteFile(
-    @Payload() data: { filename: string; provider?: string },
+    @Payload() data: { 
+      filename: string; 
+      provider?: string;
+      tenantId?: string; // Añadir tenantId
+    },
     @Ctx() context: RmqContext
   ) {
     const channel = context.getChannelRef();
@@ -61,9 +69,9 @@ export class FilesController {
     const startTime = Date.now();
 
     try {
-      this.logger.debug(`🗑️ Eliminando: ${data.filename}`);
+      this.logger.debug(`🗑️ Eliminando: ${data.filename}${data.tenantId ? ` de tenant: ${data.tenantId}` : ''}`);
       
-      const result = await this.filesService.deleteFile(data.filename, data.provider);
+      const result = await this.filesService.deleteFile(data.filename, data.provider, data.tenantId);
       await this.safeAck(channel, originalMsg);
       
       const duration = Date.now() - startTime;
@@ -73,7 +81,7 @@ export class FilesController {
       await this.safeAck(channel, originalMsg);
       this.logger.error(`❌ Error al eliminar ${data.filename}`, {
         error: error.message,
-        // duration: `${Date.now() - startTime}ms`
+        tenantId: data.tenantId
       });
       throw new RpcException({
         message: `Error al eliminar archivo: ${error.message}`,
@@ -84,7 +92,11 @@ export class FilesController {
 
   @MessagePattern('file.get')
   async getFile(
-    @Payload() data: { filename: string; provider?: string },
+    @Payload() data: { 
+      filename: string; 
+      provider?: string;
+      tenantId?: string; // Añadir tenantId
+    },
     @Ctx() context: RmqContext
   ) {
     const channel = context.getChannelRef();
@@ -92,9 +104,9 @@ export class FilesController {
     const startTime = Date.now();
 
     try {
-      this.logger.debug(`📥 Descargando: ${data.filename}`);
+      this.logger.debug(`📥 Descargando: ${data.filename}${data.tenantId ? ` de tenant: ${data.tenantId}` : ''}`);
       
-      const result = await this.filesService.getFile(data.filename, data.provider);
+      const result = await this.filesService.getFile(data.filename, data.provider, data.tenantId);
       await this.safeAck(channel, originalMsg);
       
       const duration = Date.now() - startTime;
@@ -104,7 +116,7 @@ export class FilesController {
       await this.safeAck(channel, originalMsg);
       this.logger.error(`❌ Error al descargar ${data.filename}`, {
         error: error.message,
-        // duration: `${Date.now() - startTime}ms`
+        tenantId: data.tenantId
       });
       throw new RpcException({
         message: `Error al obtener archivo: ${error.message}`,
