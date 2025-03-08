@@ -1,12 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { Logger } from '@nestjs/common';
-import { CONSOLE_COLORS } from './common/constants/colors.constants';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { envs } from './config/envs';
+import { Logger, PinoLogger } from 'nestjs-pino';
 
 async function bootstrap() {
-  const logger = new Logger(`${CONSOLE_COLORS.TEXT.MAGENTA}Files Microservice`);
+
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppModule,
     {
@@ -24,14 +23,25 @@ async function bootstrap() {
           heartbeatIntervalInSeconds: 30,
           timeout: envs.uploadTimeout,
           noDelay: true,
-        }
-      }
+        },        
+      },
+      bufferLogs: true,
+      // logger: ['error', 'warn'],
     }
   );
 
+  const logger = app.get(Logger);
+
+  const pinoLogger = await app.resolve(PinoLogger);
+
+  pinoLogger.setContext('Files-Microservice');
+
+  app.useLogger(logger);
+  
+  
+
   app.listen().then(() => {
-    logger.log(`${CONSOLE_COLORS.TEXT.GREEN}Files Microservice is running on ${envs.port} port`);
-    logger.log(`Max file size: ${envs.maxFileSize / (1024 * 1024)}MB`);
+    pinoLogger.info(`Files Microservice running - Connected to RabbitMQ`);
   });
 }
 bootstrap();

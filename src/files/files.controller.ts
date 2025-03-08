@@ -1,15 +1,22 @@
-import { Controller, Logger } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { Ctx, MessagePattern, Payload, RmqContext, RpcException } from '@nestjs/microservices';
 import { FilesService } from './files.service';
 import { formatFileSize } from 'src/common/util/format-file-size.util';
+import { PinoLogger } from 'nestjs-pino';
 
 
 
 @Controller()
 export class FilesController {
-  private readonly logger = new Logger(FilesController.name);
 
-  constructor(private readonly filesService: FilesService) {}
+  private readonly isDevelopment = process.env.NODE_ENV !== 'production';
+
+  constructor(
+    private readonly filesService: FilesService,
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext('FilesController');
+  }
 
   @MessagePattern('file.upload')
   async uploadFile(
@@ -32,22 +39,44 @@ export class FilesController {
         buffer: Buffer.from(data.file.buffer)
       };
       
-      this.logger.debug(`📤 Iniciando upload: ${file.originalname} (${fileSize})`);
+      // Log debug solo en desarrollo
+      if (this.isDevelopment) {
+        this.logger.info({ 
+          fileName: file.originalname, 
+          fileSize, 
+          provider: data.provider || 'default',
+          tenantId: data.tenantId
+        }, 'Iniciando upload');
+      }
       
       const result = await this.filesService.uploadFile(file, data.provider , data.tenantId);
       await this.safeAck(channel, originalMsg);
       
-      const duration = Date.now() - startTime;
-      this.logger.debug(`✅ Upload completado: ${file.originalname} en ${duration}ms`);
+      
+      if (this.isDevelopment) {
+        const duration = Date.now() - startTime;
+        this.logger.info({ 
+          fileName: file.originalname, 
+          duration: `${duration}ms`, 
+          fileSize,
+          provider: data.provider || 'default',
+          tenantId: data.tenantId
+        }, 'Upload completado');
+      }
       
       return result;
       
     } catch (error) {
 
       await this.safeAck(channel, originalMsg);
-      this.logger.error(`❌ Error en upload de ${data.file.originalname} (${fileSize})`, {
-        error: error.message,
-      });
+      this.logger.error({ 
+        err: error,
+        fileName: data.file.originalname, 
+        fileSize, 
+        provider: data.provider || 'default',
+        tenantId: data.tenantId
+      }, 'Error en upload');
+
       throw new RpcException({
         message: `Error al subir archivo: ${error.message}`,
         statusCode: 500
@@ -69,20 +98,38 @@ export class FilesController {
     const startTime = Date.now();
 
     try {
-      this.logger.debug(`🗑️ Eliminando: ${data.filename}${data.tenantId ? ` de tenant: ${data.tenantId}` : ''}`);
+      // Log debug solo en desarrollo
+      if (this.isDevelopment) {
+        this.logger.debug({ 
+          fileName: data.filename, 
+          provider: data.provider || 'default',
+          tenantId: data.tenantId
+        }, 'Eliminando archivo');
+      }
       
       const result = await this.filesService.deleteFile(data.filename, data.provider, data.tenantId);
       await this.safeAck(channel, originalMsg);
       
-      const duration = Date.now() - startTime;
-      this.logger.debug(`✅ Archivo eliminado: ${data.filename} en ${duration}ms`);
+            // Log de éxito solo en desarrollo
+      if (this.isDevelopment) {
+        const duration = Date.now() - startTime;
+        this.logger.debug({ 
+          fileName: data.filename, 
+          duration: `${duration}ms`,
+          provider: data.provider || 'default',
+          tenantId: data.tenantId
+        }, 'Archivo eliminado');
+      }
       return result;
     } catch (error) {
       await this.safeAck(channel, originalMsg);
-      this.logger.error(`❌ Error al eliminar ${data.filename}`, {
-        error: error.message,
+      this.logger.error({ 
+        err: error,
+        fileName: data.filename,
+        provider: data.provider || 'default',
         tenantId: data.tenantId
-      });
+      }, 'Error al eliminar archivo');
+
       throw new RpcException({
         message: `Error al eliminar archivo: ${error.message}`,
         statusCode: 500
@@ -104,20 +151,37 @@ export class FilesController {
     const startTime = Date.now();
 
     try {
-      this.logger.debug(`📥 Descargando: ${data.filename}${data.tenantId ? ` de tenant: ${data.tenantId}` : ''}`);
+      // Log debug solo en desarrollo
+      if (this.isDevelopment) {
+        this.logger.info({ 
+          fileName: data.filename,
+          provider: data.provider || 'default',
+          tenantId: data.tenantId
+        }, 'Descargando archivo');
+      }
       
       const result = await this.filesService.getFile(data.filename, data.provider, data.tenantId);
       await this.safeAck(channel, originalMsg);
       
-      const duration = Date.now() - startTime;
-      this.logger.debug(`✅ Archivo descargado: ${data.filename} en ${duration}ms`);
+      // Log de éxito solo en desarrollo
+      if (this.isDevelopment) {
+        const duration = Date.now() - startTime;
+        this.logger.info({ 
+          fileName: data.filename, 
+          duration: `${duration}ms`,
+          provider: data.provider || 'default',
+          tenantId: data.tenantId
+        }, 'Archivo descargado');
+      }
       return result;
     } catch (error) {
       await this.safeAck(channel, originalMsg);
-      this.logger.error(`❌ Error al descargar ${data.filename}`, {
-        error: error.message,
+      this.logger.error({ 
+        err: error,
+        fileName: data.filename,
+        provider: data.provider || 'default',
         tenantId: data.tenantId
-      });
+      }, 'Error al descargar archivo');
       throw new RpcException({
         message: `Error al obtener archivo: ${error.message}`,
         statusCode: 500
@@ -131,10 +195,10 @@ export class FilesController {
         await channel.ack(message);
       }
     } catch (error) {
-      this.logger.error(`❌ Error en ACK RabbitMQ`, {
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
+      this.logger.error({ 
+        err: error,
+        operation: 'rabbitmq_ack'
+      }, 'Error en ACK RabbitMQ');
     }
   }
 }

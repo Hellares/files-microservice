@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 import { StorageService } from '../common/interfaces/storage.interface';
 import * as admin from 'firebase-admin';
 import { Bucket } from '@google-cloud/storage';
@@ -8,11 +9,13 @@ import { formatFileSize } from 'src/common/util/format-file-size.util';
 
 @Injectable()
 export class FirebaseStorageService implements StorageService {
+  private readonly isDevelopment = process.env.NODE_ENV !== 'production';
   private bucket: Bucket;
-  private readonly logger = new Logger(FirebaseStorageService.name);
-   private readonly DEFAULT_TENANT = 'admin14'; // Carpeta por defecto
+  private readonly DEFAULT_TENANT = 'admin'; // Carpeta por defecto
 
-  constructor() {
+  constructor(
+    private readonly logger: PinoLogger
+  ) {
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: envs.storage.firebase.projectId,
@@ -22,6 +25,7 @@ export class FirebaseStorageService implements StorageService {
       storageBucket: envs.storage.firebase.storageBucket
     });
     this.bucket = admin.storage().bucket();
+    this.logger.setContext('firebaseStorage');
   }
 
   private bufferToStream(buffer: Buffer): Readable {
@@ -36,7 +40,7 @@ export class FirebaseStorageService implements StorageService {
     const startTime = Date.now();
     
     // Usar el tenant proporcionado o el predeterminado
-    const tenant = tenantId //|| this.DEFAULT_TENANT;
+    const tenant = tenantId || this.DEFAULT_TENANT;
     
     // Crear nombre de archivo con timestamp y nombre original
     const timestampedFilename = `${Date.now()}-${file.originalname}`;
@@ -44,8 +48,7 @@ export class FirebaseStorageService implements StorageService {
     // Construir la ruta completa incluyendo el tenant
     const filePath = `${tenant}/${timestampedFilename}`;
     
-    this.logger.debug(`Subiendo archivo a ruta: ${filePath}`);
-
+    
     try {
       if (file.size > envs.maxFileSize) {
         throw new Error(`Archivo excede el tamaño máximo permitido de ${formatFileSize(envs.maxFileSize)}`);
@@ -77,16 +80,28 @@ export class FirebaseStorageService implements StorageService {
           .pipe(uploadStream)
           .on('error', reject)
           .on('finish', resolve);
-      });
-
-      const uploadTime = Date.now() - startTime;
-      const speed = (file.size / 1024 / (uploadTime / 1000)).toFixed(2);
+      });     
       
-      this.logger.debug(`✅ Upload exitoso - ${formatFileSize(file.size)} en ${uploadTime}ms (${speed} KB/s) - Ruta: ${filePath}`);
 
+      // Solo log en desarrollo, en producción no generamos logs por operaciones normales
+    if (this.isDevelopment) {
+      const uploadTime = Date.now() - startTime;
+      const speed = (file.size / 1024 / (uploadTime / 1000)).toFixed(2);  
+      this.logger.info({ 
+        filePath, 
+        fileSize: formatFileSize(file.size),
+        uploadTime: `${uploadTime}ms`,
+        speed: `${speed} KB/s`
+      }, 'Upload exitoso');
+    }
+     
       return filePath; // Devolvemos la ruta completa
     } catch (error) {
-      this.logger.error(`❌ Error en upload: ${error.message}`);
+      this.logger.error({ 
+        err: error,
+        filePath,
+        fileName: file.originalname
+      }, 'Error en upload');
       await this.rollback(filePath);
       throw error;
     }
@@ -113,12 +128,21 @@ export class FirebaseStorageService implements StorageService {
       }
 
       await file.delete();
-      this.logger.debug(`✅ Archivo eliminado: ${filePath}`);
+      // Nivel de log según entorno
+      if (this.isDevelopment) {
+        this.logger.debug({ filePath }, 'Archivo eliminado exitosamente');
+      } 
+      // else {
+      //   // En producción, menos verbosidad
+      //   this.logger.info({ filePath }, 'Archivo eliminado');
+      // }
     } catch (error) {
-      this.logger.error('Error al eliminar archivo:', {
-        error: error.message,
-        filename
-      });
+      this.logger.error({ 
+        err: error,
+        filename,
+        operation: 'delete'
+      }, 'Error al eliminar archivo');
+      
       throw new Error(`Error al eliminar archivo: ${error.message}`);
     }
   }
@@ -133,7 +157,9 @@ export class FirebaseStorageService implements StorageService {
         filePath = `${tenant}/${filename}`;
       }
       
-      this.logger.debug(`Accediendo a archivo: ${filePath}`);
+      if (this.isDevelopment) {
+        this.logger.debug({ filePath }, 'Accediendo a archivo');
+      }
       
       const file = this.bucket.file(filePath);
       const [exists] = await file.exists();
@@ -143,23 +169,28 @@ export class FirebaseStorageService implements StorageService {
       }
 
       const [metadata] = await file.getMetadata();
-      this.logger.debug(`📥 Accediendo a archivo:`, {
-        filePath,
-        size: metadata.size,
-        contentType: metadata.contentType,
-        cached: metadata.cacheControl ? 'yes' : 'no'
-      });
+      if (this.isDevelopment) {
+        this.logger.debug({
+          filePath,
+          size: metadata.size,
+          contentType: metadata.contentType,
+          cached: metadata.cacheControl ? true : false,
+          operation: 'download'
+        }, 'Accediendo a archivo');
+      }
 
       const [fileContent] = await file.download({
         validation: false
       });
       return fileContent;
     } catch (error) {
-      this.logger.error('Error al obtener archivo:', {
-        error: error.message,
-        filename
-      });
-      throw new Error(`Error al obtener archivo: ${error.message}`);
+      this.logger.error({ 
+        err: error,
+        filename,
+        operation: 'get'
+      }, 'Error al obtener archivo');
+      
+      throw new Error(`Error al obtener archivo: ${error.message}`);;
     }
   }
 
@@ -169,10 +200,16 @@ export class FirebaseStorageService implements StorageService {
       const [exists] = await file.exists();
       if (exists) {
         await file.delete();
-        this.logger.debug(`♻️ Rollback: Archivo ${filename} eliminado`);
+        if (this.isDevelopment) {
+          this.logger.debug({ filename }, 'Rollback completado');
+        }
       }
     } catch (error) {
-      this.logger.error(`Error en rollback: ${filename}`, error);
+      this.logger.error({ 
+        err: error,
+        filename,
+        operation: 'rollback'
+      }, 'Error en rollback');
     }
   }
 }

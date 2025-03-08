@@ -1,24 +1,35 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 import { StorageFactory } from '../storage/storage.factory';
-// import { FileUrlService } from './url.service';
 
 
 @Injectable()
 export class FilesService {
-  private readonly logger = new Logger(FilesService.name);
+  private readonly isDevelopment = process.env.NODE_ENV !== 'production';
   
 
   constructor(
     private readonly storageFactory: StorageFactory,
-    // private readonly fileUrlService: FileUrlService
-  ) {}
+    private readonly logger: PinoLogger
+  ) {
+    this.logger.setContext('FilesService');
+  }
 
   async uploadFile(file: Express.Multer.File, provider?: string, tenantId?: string) {
     try {
       const storage = this.storageFactory.getStorage(provider);
       const filename = await storage.upload(file, tenantId);
 
-      this.logger.debug(`Archivo subido: ${filename}${tenantId ? ` para tenant: ${tenantId}` : ''}`);
+      // Log solo en desarrollo
+      if (this.isDevelopment) {
+        this.logger.info({ 
+          filename,
+          originalName: file.originalname,
+          size: file.size,
+          provider: provider || 'default',
+          tenantId
+        }, 'Archivo subido');
+      }
    
       return {
         filename,
@@ -27,11 +38,13 @@ export class FilesService {
         tenantId: tenantId,
       };
     } catch (error) {
-      this.logger.error('Error en upload:', {
+      this.logger.error({ 
+        err: error,
         filename: file.originalname,
-        error: error.message,
-        tenantId,
-      });
+        size: file.size,
+        provider: provider || 'default',
+        tenantId
+      }, 'Error en upload');
       throw error;
     }
   }
@@ -41,18 +54,26 @@ export class FilesService {
       const storage = this.storageFactory.getStorage(provider);
       await storage.delete(filename, tenantId);
       
-      this.logger.debug(`Archivo eliminado: ${filename}${tenantId ? ` de tenant: ${tenantId}` : ''}`);
+      // Log solo en desarrollo
+      if (this.isDevelopment) {
+        this.logger.debug({ 
+          filename,
+          provider: provider || 'default',
+          tenantId
+        }, 'Archivo eliminado');
+      }
       
       return { 
         success: true,
         tenantId
       };
     } catch (error) {
-      this.logger.error('Error al eliminar:', {
+      this.logger.error({ 
+        err: error,
         filename,
-        error: error.message,
+        provider: provider || 'default',
         tenantId
-      });
+      }, 'Error al eliminar archivo');
       throw error;
     }
   }
@@ -62,15 +83,23 @@ export class FilesService {
       const storage = this.storageFactory.getStorage(provider);
       const buffer = await storage.get(filename, tenantId);
       
-      this.logger.debug(`Archivo obtenido: ${filename}${tenantId ? ` de tenant: ${tenantId}` : ''}`);
+      if (this.isDevelopment) {
+        this.logger.debug({ 
+          filename,
+          bufferSize: buffer.length,
+          provider: provider || 'default',
+          tenantId
+        }, 'Archivo obtenido');
+      }
       
       return buffer;
     } catch (error) {
-      this.logger.error('Error al obtener:', {
+      this.logger.error({ 
+        err: error,
         filename,
-        error: error.message,
+        provider: provider || 'default',
         tenantId
-      });
+      }, 'Error al obtener archivo');
       throw error;
     }
   }
