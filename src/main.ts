@@ -15,6 +15,10 @@ async function bootstrap() {
         queue: 'files_queue',
         queueOptions: {
           durable: true,
+          arguments:{
+            'x-message-ttl':300000,
+            'x-expires': 600000
+          }
         },
         noAck: false,
         prefetchCount: 3,

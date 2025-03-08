@@ -28,13 +28,45 @@ export class FirebaseStorageService implements StorageService {
     this.logger.setContext('firebaseStorage');
   }
 
+  /**
+   * Convierte un Buffer a un Stream de manera segura
+   * Verificando que realmente es un Buffer antes de intentar convertirlo
+   */
   private bufferToStream(buffer: Buffer): Readable {
-    const stream = new Readable();
+    // Verificar que realmente es un Buffer
+    if (!Buffer.isBuffer(buffer)) {
+      throw new Error('Se esperaba un Buffer para la conversión a Stream');
+    }
+    
+    // Implementación correcta para Node.js moderno
+    const stream = new Readable({
+      read() {} // Método read vacío pero requerido
+    });
+    
     stream.push(buffer);
-    stream.push(null);
+    stream.push(null); // Señalizar fin del stream
+    
     return stream;
   }
 
+  /**
+   * Asegura que el valor proporcionado sea un Buffer
+   * Funciona igual que en el controlador, pero lo mantenemos aquí por seguridad adicional
+   */
+  private ensureBuffer(possibleBuffer: any): Buffer {
+    // Si ya es un Buffer, lo devolvemos directamente
+    if (Buffer.isBuffer(possibleBuffer)) {
+      return possibleBuffer;
+    }
+    
+    // Si es un objeto con propiedad 'data' y es un array, usamos esos datos
+    if (possibleBuffer && possibleBuffer.type === 'Buffer' && Array.isArray(possibleBuffer.data)) {
+      return Buffer.from(possibleBuffer.data);
+    }
+    
+    // Intento general (podría lanzar error si no es convertible a Buffer)
+    return Buffer.from(possibleBuffer);
+  }
   
   async upload(file: Express.Multer.File, tenantId?: string): Promise<string> {
     const startTime = Date.now();
@@ -63,11 +95,14 @@ export class FirebaseStorageService implements StorageService {
           originalName: file.originalname,
           size: file.size,
           uploadedAt: new Date().toISOString(),
-          tenantId: tenant // Guardar el tenant (original o predeterminado)
+          tenantId: tenant
         }
       };
 
-      const stream = this.bufferToStream(file.buffer);
+      // Asegurarnos de que el buffer sea realmente un Buffer usando nuestro método helper
+      const buffer = this.ensureBuffer(file.buffer);
+      const stream = this.bufferToStream(buffer);
+      
       const uploadStream = fileUpload.createWriteStream({
         metadata,
         resumable: false,
