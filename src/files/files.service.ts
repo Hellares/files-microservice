@@ -49,6 +49,8 @@ export class FilesService {
     }
   }
 
+  
+
   async deleteFile(filename: string, provider?: string, tenantId?: string) {
     try {
       const storage = this.storageFactory.getStorage(provider);
@@ -103,4 +105,5 @@ export class FilesService {
       throw error;
     }
   }
+
 }
