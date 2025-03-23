@@ -21,7 +21,7 @@ async function bootstrap() {
           }
         },
         noAck: false,
-        prefetchCount: 3,
+        prefetchCount: 8,
         socketOptions: {
           keepAlive: true,
           heartbeatIntervalInSeconds: 30,
