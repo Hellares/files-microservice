@@ -83,7 +83,7 @@ import * as joi from 'joi';
 interface EnvVars {
     PORT: number;
     RABBITMQ_SERVERS: string[];
-    STORAGE_TYPE: 'local' | 's3' | 'cloudinary' | 'firebase';
+    STORAGE_TYPE: 'local' | 's3' | 'cloudinary' | 'firebase' | 'elastika';
     LOCAL_STORAGE_PATH: string;
     MAX_FILE_SIZE: number;
     UPLOAD_TIMEOUT: number;
@@ -98,12 +98,14 @@ interface EnvVars {
     FIREBASE_CLIENT_EMAIL?: string;
     FIREBASE_PRIVATE_KEY?: string;
     FIREBASE_STORAGE_BUCKET?: string;
+    ELASTIKA_BASE_URL?: string;
+    ELASTIKA_API_KEY?: string;
 }
 
 const envsSchema = joi.object({
     PORT: joi.number().required(),
     RABBITMQ_SERVERS: joi.array().items(joi.string()).required(),
-    STORAGE_TYPE: joi.string().valid('local', 's3', 'cloudinary', 'firebase').required(),
+    STORAGE_TYPE: joi.string().valid('local', 's3', 'cloudinary', 'firebase', 'elastika').required(),
     LOCAL_STORAGE_PATH: joi.string().default('./uploads'),
     MAX_FILE_SIZE: joi.number().default(20 * 1024 * 1024), // 20MB por defecto
     UPLOAD_TIMEOUT: joi.number().default(120000), // 2 minutos por defecto
@@ -117,7 +119,9 @@ const envsSchema = joi.object({
     FIREBASE_PROJECT_ID: joi.string().when('STORAGE_TYPE', { is: 'firebase', then: joi.required() }),
     FIREBASE_CLIENT_EMAIL: joi.string().when('STORAGE_TYPE', { is: 'firebase', then: joi.required() }),
     FIREBASE_PRIVATE_KEY: joi.string().when('STORAGE_TYPE', { is: 'firebase', then: joi.required() }),
-    FIREBASE_STORAGE_BUCKET: joi.string().when('STORAGE_TYPE', { is: 'firebase', then: joi.required() })
+    FIREBASE_STORAGE_BUCKET: joi.string().when('STORAGE_TYPE', { is: 'firebase', then: joi.required() }),
+    ELASTIKA_BASE_URL: joi.string().when('STORAGE_TYPE', { is: 'elastika', then: joi.required() }),
+    ELASTIKA_API_KEY: joi.string().when('STORAGE_TYPE', { is: 'elastika', then: joi.required() }),
 })
 .unknown(true);
 
@@ -160,6 +164,10 @@ export const envs = {
             clientEmail: envVars.FIREBASE_CLIENT_EMAIL,
             privateKey: envVars.FIREBASE_PRIVATE_KEY,
             storageBucket: envVars.FIREBASE_STORAGE_BUCKET
+        },
+        elastika: {
+            baseUrl: envVars.ELASTIKA_BASE_URL,
+            apiKey: envVars.ELASTIKA_API_KEY
         }
     }
 };

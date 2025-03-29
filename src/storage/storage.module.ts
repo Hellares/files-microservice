@@ -5,6 +5,7 @@ import { CloudinaryStorageService } from './cloudinary-storage.service';
 import { StorageFactory } from './storage.factory';
 import { ConfigModule } from '@nestjs/config';
 import { FirebaseStorageService } from './firebase-storage.service';
+import { ElastikaStorageService } from './elastika-storage.service';
 
 @Module({
   imports: [ConfigModule],
@@ -13,7 +14,8 @@ import { FirebaseStorageService } from './firebase-storage.service';
     LocalStorageService,
     S3StorageService,
     CloudinaryStorageService,
-    FirebaseStorageService
+    FirebaseStorageService,
+    ElastikaStorageService,
   ],
   exports: [StorageFactory,]
 })

@@ -1,9 +1,10 @@
-import { Controller } from '@nestjs/common';
+import { Controller, UseGuards } from '@nestjs/common';
 import { Ctx, MessagePattern, Payload, RmqContext } from '@nestjs/microservices';
 import { FilesService } from './files.service';
 import { PinoLogger } from 'nestjs-pino';
 import { ensureBuffer, createFileFromBase64 } from 'src/common/utils/buffer.utils';
 import { CatchRmqErrors } from '../common/decorators/catch-rmq-errors.decorator';
+import { StorageQuotaGuard } from 'src/guard/storage-quota.guard';
 
 @Controller()
 export class FilesController {
@@ -18,6 +19,7 @@ export class FilesController {
 
   
   @MessagePattern('file.upload.optimized')
+  @UseGuards(StorageQuotaGuard)
   @CatchRmqErrors()
   async uploadFileOptimized(
     @Payload() data: { 

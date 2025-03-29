@@ -2,7 +2,6 @@ import { PinoLogger } from 'nestjs-pino';
 import { StorageService } from '../common/interfaces/storage.interface';
 import { LoggingUtils } from '../common/utils/logging.utils';
 import { ValidationUtils, ALLOWED_FILE_TYPES } from '../common/utils/validation.utils';
-import { envs } from '../config/envs';
 
 export abstract class BaseStorageService implements StorageService {
   protected readonly logger: PinoLogger;
