@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  files-microservice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: files-microservice:1.0.0
+    container_name: files-microservice
+    restart: always
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads  # Para almacenamiento local si se usa
+    environment:
+      # Configuración de conexión RabbitMQ
+      RABBITMQ_SERVERS: "amqp://jtorres:jtorres159.@161.132.50.183:5672"
+      
+      # Cola de RabbitMQ para este servicio
+      QUEUE_NAME: "files_queue"
+      
+      # Configuración del servicio
+      NODE_ENV: "production"
+      MAX_FILE_SIZE: "20971520"  # 20MB en bytes
+      UPLOAD_TIMEOUT: "120000"   # 2 minutos
+      
+      # Configuración del proveedor de almacenamiento
+      STORAGE_TYPE: "elastika"
+      ELASTIKA_BASE_URL: "http://161.132.48.141:3500"
+      ELASTIKA_API_KEY: "mathidev369"       # Añadir tu API key aquí
+      
+      # Configuración de locales para fallback
+      LOCAL_STORAGE_PATH: "/app/uploads"
+      
+      # Configuración de logs
+      LOG_LEVEL: "info"
+      
+      # Variables adicionales para RabbitMQ
+      PREFETCH_COUNT: "8"
+      HEARTBEAT_INTERVAL: "30"
+      
+      # Timeouts y límites de conexión
+      RABBITMQ_CONNECTION_TIMEOUT: "20000"
+      RABBITMQ_BLOCKED_CONNECTION_TIMEOUT: "300"
+    networks:
+      - elastika-network
+    # Limitar recursos para evitar sobrecarga
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+networks:
+  elastika-network:
+    external: true
