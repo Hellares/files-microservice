@@ -17,7 +17,6 @@ export class FilesService {
     try {
       const storage = this.storageFactory.getStorage(provider);
       const filename = await storage.upload(file, tenantId);
-
       // Log solo en desarrollo
       if (this.isDevelopment) {
         this.logger.info({ 
@@ -97,7 +96,7 @@ export class FilesService {
   async deleteFile(filename: string, provider?: string, tenantId?: string) {
     try {
       const storage = this.storageFactory.getStorage(provider);
-      await storage.delete(filename, tenantId);
+      await storage.delete(filename);
       
       return { 
         success: true,
@@ -173,6 +172,52 @@ export class FilesService {
       
       return buffer;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  async listFiles(
+    tenantId?: string,
+    provider?: string,
+  ) {
+    try {
+      if (!tenantId) {
+        throw new Error('Se requiere un tenantId para listar archivos');
+      }
+      
+      const startTime = Date.now();
+      
+      const storage = this.storageFactory.getStorage(provider);
+      const files = await storage.list(tenantId);
+      
+      const duration = Date.now() - startTime;
+      
+      // Log solo en desarrollo
+      if (this.isDevelopment) {
+        this.logger.info({ 
+          fileCount: files.length,
+          duration: `${duration}ms`,
+          provider: provider || 'default',
+          tenantId,
+          operation: 'list'
+        }, `Listado de archivos completado: ${files.length} archivos en ${duration}ms`);
+      }
+      return {
+        files,
+        summary: {
+          count: files.length,
+          tenantId,
+          provider: provider || 'default'
+        }
+      };
+    } catch (error) {
+      this.logger.error({
+        err: error,
+        provider: provider || 'default',
+        tenantId,
+        operation: 'list'
+      }, 'Error al listar archivos');
+      
       throw error;
     }
   }

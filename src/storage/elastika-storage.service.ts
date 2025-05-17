@@ -5,6 +5,8 @@ import { StorageProvider } from '../common/enums/storage-provider.enum';
 import { envs } from '../config/envs';
 import axios from 'axios';
 import * as FormData from 'form-data';
+import { createErrorMessage, simplifyError } from 'src/common/utils/error.utils';
+
 
 @Injectable()
 export class ElastikaStorageService extends BaseStorageService {
@@ -81,19 +83,27 @@ export class ElastikaStorageService extends BaseStorageService {
     try {
       // Método HTTP para eliminar el archivo
       await axios.delete(
-        `${this.baseUrl}/files/${encodeURIComponent(path)}`,
+        `${this.baseUrl}/files/delete/${encodeURIComponent(path)}`,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`
           }
-        }
+        },
       );
+
+      this.logger.debug({
+        path,
+        operation: 'delete',
+        endpoint: `${this.baseUrl}/files/delete/${path}`
+      }, 'Archivo eliminado de Elastika');
+      
     } catch (error) {
       this.logger.error({
-        err: error,
+        err: simplifyError(error),
         path
       }, 'Error al eliminar archivo de Elastika');
-      throw new Error(`Error al eliminar archivo de Elastika: ${error.message}`);
+      // throw new Error(createErrorMessage('eliminar', 'archivo de Elastika', error));
+      throw new Error(`Error al eliminar archivo de Elastika`);
     }
   }
 
@@ -115,7 +125,70 @@ export class ElastikaStorageService extends BaseStorageService {
       }, 'Error al obtener archivo de Elastika');
       throw new Error(`Error al obtener archivo de Elastika: ${error.message}`);
     }
+  }  
+
+  
+  protected async doList(tenantId: string): Promise<Array<{filename: string, size?: number, createdAt?: Date, url?: string}>> {
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/files/list`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'X-Tenant-ID': tenantId
+          }
+        }
+      );
+  
+      // Verifica que la respuesta tenga el formato esperado
+      if (response.data.files !== undefined) {
+        const files = response.data.files.map(file => {
+          // Construir URL manualmente
+          const fileName = file.filename || file.name || '';
+          const publicUrl = `${this.baseUrl}/files/${tenantId}/${fileName}`;
+  
+          return {
+            name: fileName,
+            path: `${tenantId}/${fileName}`,
+            size: file.size || 0,
+            createdAt: file.createdAt ? new Date(file.createdAt) : new Date(),
+            modifiedAt: file.modifiedAt || new Date(),
+            url: publicUrl
+          };
+        });
+  
+        return files;
+      }
+  
+      this.logger.warn({
+        tenantId,
+        responseData: response.data
+      }, 'Formato de respuesta inesperado de Elastika');
+  
+      return [];
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        this.logger.warn({
+          tenantId,
+          operation: 'list',
+          status: 404
+        }, 'No se encontraron archivos o tenant no existe en Elastika');
+  
+        return [];
+      }
+  
+      // Para otros errores, registrar y reenviar
+      this.logger.error({
+        err: error,
+        tenantId,
+        operation: 'list'
+      }, 'Error al listar archivos de Elastika');
+  
+      throw error;
+    }
   }
+  
+
 
   protected getProviderName(): string {
     return StorageProvider.ELASTIKA;

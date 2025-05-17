@@ -89,6 +89,30 @@ export class CloudinaryStorageService extends BaseStorageService {
     return Buffer.from(arrayBuffer);
   }
 
+  protected async doList(tenantId: string): Promise<Array<{filename: string, size?: number, createdAt?: Date, url?: string}>> {
+    try {
+      const result = await cloudinary.api.resources({
+        type: 'upload',
+        prefix: tenantId + '/',
+        max_results: 500
+      });
+  
+      return result.resources.map(resource => ({
+        filename: resource.public_id.replace(`${tenantId}/`, ''),
+        size: resource.bytes,
+        createdAt: new Date(resource.created_at),
+        url: resource.secure_url
+      }));
+    } catch (error) {
+      this.logger.error({
+        err: error,
+        tenantId,
+        operation: 'list'
+      }, 'Error al listar archivos de Cloudinary');
+      throw error;
+    }
+  }
+
   protected getProviderName(): string {
     return StorageProvider.CLOUDINARY;
   }

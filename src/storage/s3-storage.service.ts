@@ -52,6 +52,37 @@ export class S3StorageService extends BaseStorageService {
     return Buffer.from(await response.Body.transformToByteArray());
   }
 
+  protected async doList(tenantId: string): Promise<Array<{filename: string, size?: number, createdAt?: Date, url?: string}>> {
+    try {
+      const { ListObjectsV2Command } = await import('@aws-sdk/client-s3');
+      
+      const command = new ListObjectsV2Command({
+        Bucket: envs.storage.s3.bucket,
+        Prefix: tenantId + '/',
+      });
+  
+      const response = await this.s3Client.send(command);
+      
+      if (!response.Contents) {
+        return [];
+      }
+  
+      return response.Contents.map(item => ({
+        filename: item.Key.replace(`${tenantId}/`, ''),
+        size: item.Size,
+        createdAt: item.LastModified,
+        url: `https://${envs.storage.s3.bucket}.s3.${envs.storage.s3.region}.amazonaws.com/${item.Key}`
+      }));
+    } catch (error) {
+      this.logger.error({
+        err: error,
+        tenantId,
+        operation: 'list'
+      }, 'Error al listar archivos de S3');
+      throw error;
+    }
+  }
+
   protected getProviderName(): string {
     return StorageProvider.S3;
   }

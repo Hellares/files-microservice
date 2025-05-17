@@ -2,5 +2,5 @@ export interface StorageService {
   upload(file: Express.Multer.File, tenantId?: string): Promise<string>;
   delete(filename: string, tenantId?: string): Promise<void>;
   get(filename: string, tenantId?: string): Promise<Buffer>;
-  list?(): Promise<string[]>; // Optional
+  list?(tenantId?: string): Promise<Array<{filename: string, size?: number, createdAt?: Date, url?: string}>>; // Optional
 }

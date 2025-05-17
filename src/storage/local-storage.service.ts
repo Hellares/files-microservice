@@ -60,6 +60,41 @@ export class LocalStorageService extends BaseStorageService {
     return await fs.readFile(fullPath);
   }
 
+  protected async doList(tenantId: string): Promise<Array<{filename: string, size?: number, createdAt?: Date, url?: string}>> {
+    try {
+      const dirPath = path.join(this.uploadPath, tenantId);
+      
+      try {
+        await fs.access(dirPath);
+      } catch {
+        // Si el directorio no existe, devolver lista vacía
+        return [];
+      }
+      
+      const files = await fs.readdir(dirPath);
+      
+      const fileInfoPromises = files.map(async (filename) => {
+        const filePath = path.join(dirPath, filename);
+        const stats = await fs.stat(filePath);
+        
+        return {
+          filename,
+          size: stats.size,
+          createdAt: stats.birthtime,
+        };
+      });
+      
+      return await Promise.all(fileInfoPromises);
+    } catch (error) {
+      this.logger.error({
+        err: error,
+        tenantId,
+        operation: 'list'
+      }, 'Error al listar archivos locales');
+      throw error;
+    }
+  }
+
   protected getProviderName(): string {
     return StorageProvider.LOCAL;
   }

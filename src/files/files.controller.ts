@@ -49,54 +49,6 @@ export class FilesController {
     );
   }
 
-  /**
-   * Endpoint para subir múltiples archivos a la vez en formato base64
-   * Optimizado para transferencias eficientes a través de RabbitMQ
-   */
-  @MessagePattern('files.upload.batch')
-  @CatchRmqErrors()
-  async uploadMultipleFiles(
-    @Payload() data: {
-      files: {
-        originalname: string,
-        mimetype: string,
-        size: number,
-        bufferBase64: string
-      }[],
-      provider?: string,
-      tenantId?: string,
-      batchId?: string
-    },
-    @Ctx() context: RmqContext
-  ) {
-    // Convertir cada archivo base64 a un objeto File de Multer
-    const files = data.files.map(fileData => 
-      createFileFromBase64(
-        fileData.originalname,
-        fileData.mimetype,
-        fileData.size,
-        fileData.bufferBase64
-      )
-    );
-    
-    // Si se proporcionó un batchId, registrarlo
-    if (data.batchId && this.isDevelopment) {
-      this.logger.info({
-        batchId: data.batchId,
-        fileCount: files.length,
-        operation: 'batch_upload'
-      }, `Iniciando subida por lotes con ${files.length} archivos`);
-    }
-
-    // Procesar todos los archivos
-    return await this.filesService.uploadMultipleFiles(
-      files,
-      data.provider,
-      data.tenantId,
-      data.batchId
-    );
-  }
-
   @MessagePattern('file.delete')
   @CatchRmqErrors()
   async deleteFile(
@@ -134,7 +86,7 @@ export class FilesController {
     );
   }
 
-  @MessagePattern('file.get')
+  @MessagePattern('file.get') //descargar file
   @CatchRmqErrors()
   async getFile(
     @Payload() data: { 
@@ -148,6 +100,21 @@ export class FilesController {
       data.filename, 
       data.provider, 
       data.tenantId
+    );
+  }
+
+  @MessagePattern('files.list') //listar files del vps directamente
+  @CatchRmqErrors()
+  async listFiles(
+    @Payload() data: { 
+      tenantId: string;
+      provider?: string;
+    },
+    @Ctx() context: RmqContext
+  ) {
+    return await this.filesService.listFiles(
+      data.tenantId,
+      data.provider, 
     );
   }
 }

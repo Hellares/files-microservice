@@ -1,5 +1,9 @@
 import { PinoLogger } from 'nestjs-pino';
 import { formatFileSize } from './format-file-size.util';
+import { simplifyError } from './error.utils';
+
+
+
 
 /**
  * Clase de utilidad para centralizar y optimizar el logging
@@ -132,6 +136,48 @@ export class LoggingUtils {
   }
 
   /**
+   * Registra el inicio de una operación de descarga de archivo
+   */
+  static logListStart(
+    logger: PinoLogger, 
+    fileName: string,
+    provider: string = 'default',
+    tenantId?: string
+  ): void {
+    if (!this.isDevelopment) return;
+
+    logger.info({ 
+      fileName, 
+      provider,
+      tenantId,
+      traceId: this.generateTraceId(fileName)
+    }, 'Lista de archivos');
+  }
+
+  static logListComplete(
+    logger: PinoLogger, 
+    fileName: string,
+    duration: number | string,
+    provider: string = 'default',
+    tenantId?: string
+  ): void {
+    if (!this.isDevelopment) return;
+    
+    const formattedDuration = typeof duration === 'number'
+      ? `${duration}ms`
+      : duration;
+
+    logger.debug({ 
+      fileName, 
+      duration: formattedDuration,
+      provider,
+      tenantId,
+      traceId: this.generateTraceId(fileName)
+    }, 'Lista de archivos');
+  }
+
+
+  /**
    * Registra la finalización de una operación de descarga de archivo
    */
   static logDownloadComplete(
@@ -176,7 +222,7 @@ export class LoggingUtils {
     additionalInfo: Record<string, any> = {}
   ): void {
     logger.error({ 
-      err: error,
+      err: simplifyError(error),
       fileName,
       operation,
       provider,

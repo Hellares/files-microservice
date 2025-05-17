@@ -50,7 +50,7 @@ import { StorageModule } from './storage/storage.module';
           err: (err) => ({
             type: err.constructor.name,
             message: err.message,
-            stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
+            // stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
           }),
         },
       },

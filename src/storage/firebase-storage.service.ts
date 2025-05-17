@@ -142,6 +142,38 @@ export class FirebaseStorageService extends BaseStorageService {
     }
   }
 
+  protected async doList(tenantId: string): Promise<Array<{filename: string, size?: number, createdAt?: Date, url?: string}>> {
+    try {
+      const [files] = await this.bucket.getFiles({
+        prefix: tenantId + '/'
+      });
+  
+      const results = await Promise.all(files.map(async (file) => {
+        const [metadata] = await file.getMetadata();
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: Date.now() + 24 * 60 * 60 * 1000, // 24 horas
+        });
+        
+        return {
+          filename: file.name.replace(`${tenantId}/`, ''),
+          //size: parseInt(metadata.size),
+          createdAt: new Date(metadata.timeCreated),
+          url
+        };
+      }));
+  
+      return results;
+    } catch (error) {
+      this.logger.error({
+        err: error,
+        tenantId,
+        operation: 'list'
+      }, 'Error al listar archivos de Firebase');
+      throw error;
+    }
+  }
+
   protected getProviderName(): string {
     return StorageProvider.FIREBASE;
   }

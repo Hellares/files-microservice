@@ -13,6 +13,8 @@ export abstract class BaseStorageService implements StorageService {
     this.logger.setContext(contextName);
   }
 
+  
+
   /**
    * Construye la ruta completa, incluyendo el tenant si es necesario
    */
@@ -39,6 +41,58 @@ export abstract class BaseStorageService implements StorageService {
    * Método abstracto para get específico de cada proveedor
    */
   protected abstract doGet(path: string): Promise<Buffer>;
+
+  /**
+   * Método abstracto para listar archivos específico de cada proveedor
+   */
+  protected abstract doList(tenantId: string): Promise<Array<{filename: string, size?: number, createdAt?: Date, url?: string}>>;
+
+
+  async list(tenantId?: string): Promise<Array<{ filename: string; size?: number; createdAt?: Date; url?: string; }>> {
+    const startTime = Date.now();
+    const tenant = tenantId || this.DEFAULT_TENANT;
+    
+    try {
+      // Log de inicio
+      if (this.isDevelopment) {
+        LoggingUtils.logListStart(
+          this.logger, 
+          tenant, 
+          this.getProviderName(), 
+        );
+      }
+      
+      // Llamar a la implementación específica
+      const files = await this.doList(tenant);
+      
+      // Log de finalización
+      if (this.isDevelopment) {
+        const duration = Date.now() - startTime;
+        LoggingUtils.logListComplete(
+          this.logger, 
+          tenant, 
+          files.length, 
+          this.getProviderName(), 
+
+        );
+      }
+      
+      return files;
+    } catch (error) {
+      // Log de error
+      LoggingUtils.logError(
+        this.logger, 
+        error, 
+        tenant, 
+        'list', 
+        this.getProviderName(), 
+        tenantId
+      );
+      
+      throw error;
+    }
+  }
+
 
   /**
    * Implementación común de upload con manejo de errores y logging
@@ -105,8 +159,7 @@ export abstract class BaseStorageService implements StorageService {
    */
   async delete(filename: string, tenantId?: string): Promise<void> {
     const startTime = Date.now();
-    const path = this.buildPath(filename, tenantId);
-    
+    const path = this.buildPath(filename);    
     try {
       // Log de inicio
       if (this.isDevelopment) {
@@ -196,6 +249,8 @@ export abstract class BaseStorageService implements StorageService {
       throw error;
     }
   }
+
+  
 
   /**
    * Detecta el tipo de archivo según su MIME type
