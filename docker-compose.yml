@@ -27,7 +27,7 @@ services:
       UPLOAD_TIMEOUT: "120000"
       
       # Configuración de RabbitMQ
-      RABBITMQ_SERVERS: "amqp://jtorres:jtorres159.@161.132.50.183:5672"
+      RABBITMQ_SERVERS: "amqp://admin:admin123@rabbitmq-server:5672"
       QUEUE_NAME: "files_queue"
       PREFETCH_COUNT: "8"
       HEARTBEAT_INTERVAL: "30"
@@ -35,7 +35,7 @@ services:
       RABBITMQ_BLOCKED_CONNECTION_TIMEOUT: "300"
       
       # Configuración de Elastika
-      ELASTIKA_BASE_URL: "http://161.132.48.141:3500"
+      ELASTIKA_BASE_URL: "https://images.syncronize.net.pe/"
       ELASTIKA_API_KEY: "mathidev369"
       
       # Configuración de Firebase
