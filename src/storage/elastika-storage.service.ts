@@ -131,7 +131,7 @@ export class ElastikaStorageService extends BaseStorageService {
   protected async doList(tenantId: string): Promise<Array<{filename: string, size?: number, createdAt?: Date, url?: string}>> {
     try {
       const response = await axios.get(
-        `${this.baseUrl}/files/list`,
+        `${this.baseUrl}/files-list`,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
